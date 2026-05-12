@@ -67,35 +67,21 @@ class TimetableRepository(context: Context) {
             .put("baseStatus", baseStatus.name)
             .put("cycleEnabled", cycleEnabled)
             .put("cycleStartWeekOfYear", cycleStartWeekOfYear)
-            .put("cycleLengthWeeks", cycleLengthWeeks)
-            .put("onlineWeekIndices", JSONArray(onlineWeekIndices))
+            .put("repeatGapWeeks", repeatGapWeeks)
             .put("note", note)
     }
 
     private fun JSONObject.toTimetableEntry(): TimetableEntry {
         val cycleEnabled = optBoolean("cycleEnabled", false)
-        val oldOnlineOnOddWeeks = optBoolean("onlineOnOddWeeks", true)
-        val cycleLengthWeeks = optInt("cycleLengthWeeks", if (cycleEnabled) 2 else 1).coerceAtLeast(1)
+        val oldOnlineOnOddWeeks = optBoolean("onlineOnOddWeeks", false)
+        val legacyCycleLengthWeeks = optInt("cycleLengthWeeks", if (cycleEnabled) 3 else 1).coerceAtLeast(1)
         val cycleStartWeekOfYear = optInt("cycleStartWeekOfYear", 1).coerceAtLeast(1)
-        val onlineWeekIndices = runCatching {
-            val array = optJSONArray("onlineWeekIndices")
-            if (array == null || array.length() == 0) {
-                if (cycleEnabled) {
-                    if (oldOnlineOnOddWeeks) listOf(1) else listOf(2.coerceAtMost(cycleLengthWeeks))
-                } else {
-                    emptyList()
-                }
-            } else {
-                buildList {
-                    for (index in 0 until array.length()) {
-                        val value = array.optInt(index, -1)
-                        if (value in 1..cycleLengthWeeks && !contains(value)) {
-                            add(value)
-                        }
-                    }
-                }
-            }
-        }.getOrDefault(if (cycleEnabled) listOf(1) else emptyList())
+        val repeatGapWeeks = when {
+            has("repeatGapWeeks") -> optInt("repeatGapWeeks", 2).coerceAtLeast(1)
+            has("cycleLengthWeeks") -> (legacyCycleLengthWeeks - 1).coerceAtLeast(1)
+            has("onlineOnOddWeeks") -> if (oldOnlineOnOddWeeks) 1 else 2
+            else -> 2
+        }
 
         return TimetableEntry(
             id = optLong("id", System.currentTimeMillis()),
@@ -109,8 +95,7 @@ class TimetableRepository(context: Context) {
             }.getOrDefault(StudyStatus.ONLINE),
             cycleEnabled = cycleEnabled,
             cycleStartWeekOfYear = cycleStartWeekOfYear,
-            cycleLengthWeeks = cycleLengthWeeks,
-            onlineWeekIndices = onlineWeekIndices,
+            repeatGapWeeks = repeatGapWeeks,
             note = optString("note", ""),
         )
     }

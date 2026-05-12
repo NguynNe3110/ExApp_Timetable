@@ -100,22 +100,48 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="Bật chu kì luân phiên online/offline theo tuần" />
+            android:text="Bật chu kì luân phiên" />
 
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/cycleWeekLayout"
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Ví dụ: khoảng cách lặp lại = 2, nếu tuần bắt đầu là Offline thì tuần bắt đầu Offline, 2 tuần kế tiếp Online, rồi lặp lại chuỗi đó."
+            android:textColor="#6B6B6B"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:id="@+id/cycleFieldsContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:hint="Tuần bắt đầu online"
-            app:endIconMode="dropdown_menu">
+            android:orientation="vertical">
 
-            <com.google.android.material.textfield.MaterialAutoCompleteTextView
-                android:id="@+id/cycleWeekField"
+            <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="none" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:hint="Tuần bắt đầu chu kì (ví dụ 20)">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/cycleStartWeekField"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:hint="Khoảng cách lặp lại (N tuần)">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/repeatGapField"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"

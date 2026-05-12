@@ -20,7 +20,8 @@ class NotificationReceiver : BroadcastReceiver() {
             "Hôm nay chưa có môn học nào được lên lịch."
         } else {
             val summary = todayEntries.joinToString(separator = " • ") { entry ->
-                "${formatTime(entry.startMinuteOfDay)} ${entry.subject} (${entry.effectiveStatus(weekOfYear).name.lowercase().replaceFirstChar { char -> char.uppercase() }})"
+                val statusText = if (entry.effectiveStatus(weekOfYear) == StudyStatus.ONLINE) "Online" else "Offline"
+                "${formatTime(entry.startMinuteOfDay)} ${entry.subject} - Phòng ${entry.room} ($statusText)"
             }
             "Hôm nay có ${todayEntries.size} môn: $summary"
         }

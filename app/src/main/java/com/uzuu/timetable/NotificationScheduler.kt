@@ -21,6 +21,7 @@ object NotificationScheduler {
         ensureChannel(context)
 
         val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
+
         val reminderIntent = PendingIntent.getBroadcast(
             context,
             REQUEST_CODE_REMINDER,
@@ -38,10 +39,21 @@ object NotificationScheduler {
         )
 
         val nextTrigger = nextTriggerMillis(reminderTime.hour, reminderTime.minute)
-        alarmManager.setAlarmClock(
-            AlarmManager.AlarmClockInfo(nextTrigger, contentIntent),
-            reminderIntent,
-        )
+
+        val canUseExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        if (canUseExact) {
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(nextTrigger, contentIntent),
+                reminderIntent,
+            )
+        } else {
+            // Fallback for devices where exact alarm permission is blocked.
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                nextTrigger,
+                reminderIntent,
+            )
+        }
     }
 
     fun cancel(context: Context) {

@@ -20,26 +20,28 @@ data class TimetableEntry(
     val dayOfWeek: Int,
     val subject: String,
     val room: String,
-    val cycleStartWeekOfYear: Int,
-    val cycleLengthWeeks: Int,
-    val onlineWeekIndices: List<Int>,
+    val startMinuteOfDay: Int,
     val endMinuteOfDay: Int,
     val baseStatus: StudyStatus,
     val cycleEnabled: Boolean,
-    val onlineOnOddWeeks: Boolean,
+    val cycleStartWeekOfYear: Int,
+    val repeatGapWeeks: Int,
     val note: String = "",
 ) {
     fun effectiveStatus(currentWeekOfYear: Int): StudyStatus {
         if (!cycleEnabled) {
-        val normalizedLength = cycleLengthWeeks.coerceAtLeast(1)
+            return baseStatus
+        }
+
         val normalizedStart = cycleStartWeekOfYear.coerceAtLeast(1)
-        val relativeWeekIndex = floorMod(currentWeekOfYear - normalizedStart, normalizedLength) + 1
-        return if (onlineWeekIndices.contains(relativeWeekIndex)) {
-            StudyStatus.ONLINE
-        return if (onlineOnOddWeeks) {
-            StudyStatus.OFFLINE
+        val gap = repeatGapWeeks.coerceAtLeast(1)
+        val loopLength = gap + 1
+        val relative = floorMod(currentWeekOfYear - normalizedStart, loopLength)
+
+        return if (relative == 0) {
+            baseStatus
         } else {
-            if (isOddWeek) StudyStatus.OFFLINE else StudyStatus.ONLINE
+            oppositeStatus(baseStatus)
         }
     }
 }
@@ -87,32 +89,17 @@ fun currentWeekOfYear(calendar: Calendar = Calendar.getInstance()): Int {
 }
 
 fun normalizeWeekIndex(value: Int, cycleLengthWeeks: Int): Int {
-    if (cycleLengthWeeks <= 0) {
-        return 1
-    }
-
-    val normalized = ((value - 1) % cycleLengthWeeks + cycleLengthWeeks) % cycleLengthWeeks
+    val normalizedLength = cycleLengthWeeks.coerceAtLeast(1)
+    val normalized = floorMod(value - 1, normalizedLength)
     return normalized + 1
+}
+
+fun oppositeStatus(status: StudyStatus): StudyStatus {
+    return if (status == StudyStatus.ONLINE) StudyStatus.OFFLINE else StudyStatus.ONLINE
 }
 
 fun floorMod(value: Int, divisor: Int): Int {
     return ((value % divisor) + divisor) % divisor
-}
-
-fun parseOnlineWeeks(input: String, cycleLengthWeeks: Int): List<Int>? {
-    val normalizedLength = cycleLengthWeeks.coerceAtLeast(1)
-    val trimmed = input.trim()
-    if (trimmed.isEmpty()) {
-        return null
-    }
-
-    val parsed = trimmed
-        .split(',', ' ', ';')
-        .mapNotNull { token -> token.trim().toIntOrNull() }
-        .filter { index -> index in 1..normalizedLength }
-        .distinct()
-
-    return parsed.ifEmpty { null }
 }
 
 fun parseTimeToMinuteOfDay(input: String): Int? {

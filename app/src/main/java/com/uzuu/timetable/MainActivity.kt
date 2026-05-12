@@ -1,8 +1,10 @@
 package com.uzuu.timetable
 
 import android.Manifest
+import android.app.AlarmManager
 import android.app.TimePickerDialog
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -34,16 +36,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var clockText: TextView
     private lateinit var reminderText: TextView
 
-    private var pendingReminderTime: ReminderTime? = null
-
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        if (granted) {
-            pendingReminderTime?.let { saveReminderTime(it) }
-        } else {
-            pendingReminderTime = null
-            showToast("Chưa cấp quyền thông báo nên nhắc lịch sẽ không hiển thị")
+        if (!granted) {
+            showToast("Đã lưu giờ nhắc, nhưng bạn chưa cấp quyền thông báo")
         }
     }
 
@@ -228,11 +225,7 @@ class MainActivity : AppCompatActivity() {
         statusChip.setTextColor(getColorCompat(android.R.color.black))
 
         if (entry.cycleEnabled) {
-            cycleChip.text = if (entry.onlineOnOddWeeks) {
-                "Chu kì: tuần lẻ online"
-            } else {
-                "Chu kì: tuần chẵn online"
-            }
+            cycleChip.text = "Chu kì: N=${entry.repeatGapWeeks}"
             cycleChip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(getColorCompat(R.color.cycle_active))
         } else {
             cycleChip.text = "Chu kì: tắt"
@@ -259,16 +252,15 @@ class MainActivity : AppCompatActivity() {
         val endTimeField = view.findViewById<TextInputEditText>(R.id.endTimeField)
         val statusField = view.findViewById<MaterialAutoCompleteTextView>(R.id.statusField)
         val cycleSwitch = view.findViewById<MaterialSwitch>(R.id.cycleSwitch)
-        val cycleWeekField = view.findViewById<MaterialAutoCompleteTextView>(R.id.cycleWeekField)
+        val cycleStartWeekField = view.findViewById<TextInputEditText>(R.id.cycleStartWeekField)
+        val repeatGapField = view.findViewById<TextInputEditText>(R.id.repeatGapField)
         val noteField = view.findViewById<TextInputEditText>(R.id.noteField)
 
         val dayOptions = orderedWeekDays().map(::dayLabel)
         val statusOptions = listOf("Online", "Offline")
-        val cycleOptions = listOf("Tuần lẻ", "Tuần chẵn")
 
         dayField.setAdapter(createDropdownAdapter(dayOptions))
         statusField.setAdapter(createDropdownAdapter(statusOptions))
-        cycleWeekField.setAdapter(createDropdownAdapter(cycleOptions))
 
         if (existing != null) {
             subjectField.setText(existing.subject)
@@ -278,13 +270,23 @@ class MainActivity : AppCompatActivity() {
             endTimeField.setText(formatTime(existing.endMinuteOfDay))
             statusField.setText(statusLabel(existing.baseStatus), false)
             cycleSwitch.isChecked = existing.cycleEnabled
-            cycleWeekField.setText(if (existing.onlineOnOddWeeks) "Tuần lẻ" else "Tuần chẵn", false)
+            cycleStartWeekField.setText(existing.cycleStartWeekOfYear.toString())
+            repeatGapField.setText(existing.repeatGapWeeks.toString())
             noteField.setText(existing.note)
         } else {
             dayField.setText(dayOptions.first(), false)
             statusField.setText(statusOptions.first(), false)
-            cycleWeekField.setText(cycleOptions.first(), false)
+            cycleStartWeekField.setText(currentWeekOfYear().toString())
+            repeatGapField.setText("2")
         }
+
+        fun updateCycleFieldsVisibility() {
+            val visibility = if (cycleSwitch.isChecked) View.VISIBLE else View.GONE
+            view.findViewById<View>(R.id.cycleFieldsContainer).visibility = visibility
+        }
+
+        updateCycleFieldsVisibility()
+        cycleSwitch.setOnCheckedChangeListener { _, _ -> updateCycleFieldsVisibility() }
 
         val title = if (existing == null) "Thêm môn học" else "Chỉnh sửa môn học"
         val dialog = MaterialAlertDialogBuilder(this)
@@ -304,13 +306,13 @@ class MainActivity : AppCompatActivity() {
                 val statusText = statusField.text?.toString()?.trim().orEmpty()
                 val note = noteField.text?.toString()?.trim().orEmpty()
                 val cycleEnabled = cycleSwitch.isChecked
-                val cycleText = cycleWeekField.text?.toString()?.trim().orEmpty()
+                val cycleStartWeek = cycleStartWeekField.text?.toString()?.trim()?.toIntOrNull()
+                val repeatGapWeeks = repeatGapField.text?.toString()?.trim()?.toIntOrNull()
 
                 val dayOfWeek = orderedWeekDays().firstOrNull { dayLabel(it) == dayLabelValue }
                 val startMinute = parseTimeToMinuteOfDay(startTimeText)
                 val endMinute = parseTimeToMinuteOfDay(endTimeText)
                 val baseStatus = if (statusText == "Offline") StudyStatus.OFFLINE else StudyStatus.ONLINE
-                val onlineOnOddWeeks = cycleText != "Tuần chẵn"
 
                 if (subject.isBlank()) {
                     subjectField.error = "Nhập tên môn học"
@@ -337,6 +339,18 @@ class MainActivity : AppCompatActivity() {
                     return@setOnClickListener
                 }
 
+                if (cycleEnabled) {
+                    if (cycleStartWeek == null || cycleStartWeek < 1) {
+                        showToast("Nhập tuần bắt đầu chu kì hợp lệ, ví dụ 20")
+                        return@setOnClickListener
+                    }
+
+                    if (repeatGapWeeks == null || repeatGapWeeks < 1) {
+                        showToast("Khoảng cách lặp lại phải từ 1 tuần trở lên")
+                        return@setOnClickListener
+                    }
+                }
+
                 val entry = TimetableEntry(
                     id = existing?.id ?: System.currentTimeMillis(),
                     dayOfWeek = dayOfWeek,
@@ -346,7 +360,8 @@ class MainActivity : AppCompatActivity() {
                     endMinuteOfDay = endMinute,
                     baseStatus = baseStatus,
                     cycleEnabled = cycleEnabled,
-                    onlineOnOddWeeks = onlineOnOddWeeks,
+                    cycleStartWeekOfYear = cycleStartWeek ?: currentWeekOfYear(),
+                    repeatGapWeeks = repeatGapWeeks ?: 2,
                     note = note,
                 )
 
@@ -364,7 +379,8 @@ class MainActivity : AppCompatActivity() {
             this,
             { _, hourOfDay, minute ->
                 val selectedTime = ReminderTime(hourOfDay, minute)
-                requestNotificationPermissionIfNeeded(selectedTime)
+                persistReminderTime(selectedTime)
+                requestNotificationPermissionIfNeeded()
             },
             reminder.hour,
             reminder.minute,
@@ -372,19 +388,36 @@ class MainActivity : AppCompatActivity() {
         ).show()
     }
 
-    private fun requestNotificationPermissionIfNeeded(reminderTime: ReminderTime) {
+    private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            pendingReminderTime = reminderTime
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            saveReminderTime(reminderTime)
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        requestExactAlarmPermissionIfNeeded()
+    }
+
+    private fun requestExactAlarmPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager = getSystemService(AlarmManager::class.java)
+            if (!alarmManager.canScheduleExactAlarms()) {
+                MaterialAlertDialogBuilder(this)
+                    .setTitle("Cần quyền đặt báo thức")
+                    .setMessage("Để ứng dụng nhắc lịch học đúng giờ, bạn cần cho phép ứng dụng đặt báo thức chính xác trong cài đặt hệ thống.")
+                    .setPositiveButton("Đi đến cài đặt") { _, _ ->
+                        startActivity(Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                            data = android.net.Uri.fromParts("package", packageName, null)
+                        })
+                    }
+                    .setNegativeButton("Để sau", null)
+                    .show()
+            }
         }
     }
 
-    private fun saveReminderTime(reminderTime: ReminderTime) {
+    private fun persistReminderTime(reminderTime: ReminderTime) {
         repository.saveReminderTime(reminderTime)
         NotificationScheduler.schedule(this, reminderTime)
-        pendingReminderTime = null
         renderAll()
         showToast("Đã đặt nhắc lịch lúc ${formatReminderTime(reminderTime)}")
     }
