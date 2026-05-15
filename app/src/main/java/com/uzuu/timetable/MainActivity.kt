@@ -101,21 +101,27 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderSummary() {
         val calendar = Calendar.getInstance()
-        val todayLabel = formatTodayLabel(calendar)
-        clockText.text = todayLabel
-
         val todayEntries = entries
             .filter { it.dayOfWeek == calendar.get(Calendar.DAY_OF_WEEK) }
             .sortedBy { it.startMinuteOfDay }
 
         val weekNumber = currentWeekOfYear(calendar)
+        val todayLabel = formatTodayLabel(calendar)
+        // If there is a next class today, show its room next to the date
+        val nextClassForClock = todayEntries.firstOrNull { it.startMinuteOfDay >= calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE) }
+            ?: todayEntries.firstOrNull()
+        clockText.text = if (nextClassForClock != null) {
+            "$todayLabel • Phòng: ${nextClassForClock.room}"
+        } else {
+            todayLabel
+        }
         val summaryText = when {
             todayEntries.isEmpty() -> "Hôm nay chưa có môn học nào."
             else -> {
                 val nextClass = todayEntries.firstOrNull { it.startMinuteOfDay >= calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE) }
                     ?: todayEntries.first()
                 val nextStatus = nextClass.effectiveStatus(weekNumber)
-                "${todayEntries.size} môn hôm nay. Tiết gần nhất: ${nextClass.subject} lúc ${formatTime(nextClass.startMinuteOfDay)} (${statusLabel(nextStatus)})"
+                "${todayEntries.size} môn hôm nay. Tiết gần nhất: ${nextClass.subject} lúc ${formatTime(nextClass.startMinuteOfDay)} - Phòng ${nextClass.room} (${statusLabel(nextStatus)})"
             }
         }
 

@@ -9,7 +9,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="4dp">
+        android:paddingRight="24dp"
+        android:paddingTop="8dp"
+        android:paddingLeft="24dp">
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
@@ -106,7 +108,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Ví dụ: khoảng cách lặp lại = 2 thì giữ trạng thái đã chọn 2 tuần, sau đó đổi sang trạng thái ngược 2 tuần rồi lặp lại."
+            android:text="Ví dụ: chọn Online + khoảng cách = 2 nghĩa là Online tuần này, 2 tuần tiếp theo là Offline, rồi lặp lại."
             android:textColor="#6B6B6B"
             android:textSize="13sp" />
 

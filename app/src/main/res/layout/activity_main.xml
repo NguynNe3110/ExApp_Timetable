@@ -24,15 +24,6 @@
             android:textSize="28sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/subtitleText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Quản lý môn học, phòng học, trạng thái online/offline và nhắc lịch theo giờ"
-            android:textColor="#5B5B5B"
-            android:textSize="14sp" />
-
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/summaryCard"
             android:layout_width="match_parent"
