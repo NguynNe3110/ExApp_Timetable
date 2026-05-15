@@ -35,10 +35,10 @@ data class TimetableEntry(
 
         val normalizedStart = cycleStartWeekOfYear.coerceAtLeast(1)
         val gap = repeatGapWeeks.coerceAtLeast(1)
-        val loopLength = gap + 1
+        val loopLength = gap * 2
         val relative = floorMod(currentWeekOfYear - normalizedStart, loopLength)
 
-        return if (relative == 0) {
+        return if (relative < gap) {
             baseStatus
         } else {
             oppositeStatus(baseStatus)

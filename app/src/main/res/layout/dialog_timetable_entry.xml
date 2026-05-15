@@ -106,7 +106,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Ví dụ: khoảng cách lặp lại = 2, nếu tuần bắt đầu là Offline thì tuần bắt đầu Offline, 2 tuần kế tiếp Online, rồi lặp lại chuỗi đó."
+            android:text="Ví dụ: khoảng cách lặp lại = 2 thì giữ trạng thái đã chọn 2 tuần, sau đó đổi sang trạng thái ngược 2 tuần rồi lặp lại."
             android:textColor="#6B6B6B"
             android:textSize="13sp" />
 
@@ -116,18 +116,6 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:orientation="vertical">
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Tuần bắt đầu chu kì (ví dụ 20)">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/cycleStartWeekField"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="number" />
-            </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"

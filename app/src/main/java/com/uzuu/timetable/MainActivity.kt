@@ -252,7 +252,6 @@ class MainActivity : AppCompatActivity() {
         val endTimeField = view.findViewById<TextInputEditText>(R.id.endTimeField)
         val statusField = view.findViewById<MaterialAutoCompleteTextView>(R.id.statusField)
         val cycleSwitch = view.findViewById<MaterialSwitch>(R.id.cycleSwitch)
-        val cycleStartWeekField = view.findViewById<TextInputEditText>(R.id.cycleStartWeekField)
         val repeatGapField = view.findViewById<TextInputEditText>(R.id.repeatGapField)
         val noteField = view.findViewById<TextInputEditText>(R.id.noteField)
 
@@ -270,14 +269,12 @@ class MainActivity : AppCompatActivity() {
             endTimeField.setText(formatTime(existing.endMinuteOfDay))
             statusField.setText(statusLabel(existing.baseStatus), false)
             cycleSwitch.isChecked = existing.cycleEnabled
-            cycleStartWeekField.setText(existing.cycleStartWeekOfYear.toString())
             repeatGapField.setText(existing.repeatGapWeeks.toString())
             noteField.setText(existing.note)
         } else {
             dayField.setText(dayOptions.first(), false)
             statusField.setText(statusOptions.first(), false)
-            cycleStartWeekField.setText(currentWeekOfYear().toString())
-            repeatGapField.setText("2")
+            repeatGapField.setText("1")
         }
 
         fun updateCycleFieldsVisibility() {
@@ -306,7 +303,6 @@ class MainActivity : AppCompatActivity() {
                 val statusText = statusField.text?.toString()?.trim().orEmpty()
                 val note = noteField.text?.toString()?.trim().orEmpty()
                 val cycleEnabled = cycleSwitch.isChecked
-                val cycleStartWeek = cycleStartWeekField.text?.toString()?.trim()?.toIntOrNull()
                 val repeatGapWeeks = repeatGapField.text?.toString()?.trim()?.toIntOrNull()
 
                 val dayOfWeek = orderedWeekDays().firstOrNull { dayLabel(it) == dayLabelValue }
@@ -340,16 +336,13 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (cycleEnabled) {
-                    if (cycleStartWeek == null || cycleStartWeek < 1) {
-                        showToast("Nhập tuần bắt đầu chu kì hợp lệ, ví dụ 20")
-                        return@setOnClickListener
-                    }
-
                     if (repeatGapWeeks == null || repeatGapWeeks < 1) {
                         showToast("Khoảng cách lặp lại phải từ 1 tuần trở lên")
                         return@setOnClickListener
                     }
                 }
+
+                val cycleStartWeek = if (cycleEnabled) currentWeekOfYear() else 1
 
                 val entry = TimetableEntry(
                     id = existing?.id ?: System.currentTimeMillis(),
@@ -360,7 +353,7 @@ class MainActivity : AppCompatActivity() {
                     endMinuteOfDay = endMinute,
                     baseStatus = baseStatus,
                     cycleEnabled = cycleEnabled,
-                    cycleStartWeekOfYear = cycleStartWeek ?: currentWeekOfYear(),
+                    cycleStartWeekOfYear = cycleStartWeek,
                     repeatGapWeeks = repeatGapWeeks ?: 2,
                     note = note,
                 )
