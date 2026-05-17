@@ -17,6 +17,12 @@ class FirebaseRepository {
     private val classesRef = database.getReference("classes")
     private val proposalsRef = database.getReference("proposals")
 
+    init {
+        // Giữ data luôn được sync — không cần thoát app mới thấy thay đổi
+        classesRef.keepSynced(true)
+        proposalsRef.keepSynced(true)
+    }
+
     // Classes operations
     suspend fun getClasses(): List<ClassTimetable> = suspendCancellableCoroutine { continuation ->
         Log.d(DEBUG_TAG, "getClasses: start")
@@ -98,21 +104,23 @@ class FirebaseRepository {
             }
 
             override fun onCancelled(error: DatabaseError) {
-                Log.d(DEBUG_TAG, "getClassById: failed to read classId=$classId message=${error.message}", error.toException())
+                Log.d(DEBUG_TAG, "getClassById: failed classId=$classId message=${error.message}", error.toException())
                 continuation.resume(null)
             }
         })
     }
 
     suspend fun saveClass(classTimetable: ClassTimetable): Boolean = suspendCancellableCoroutine { continuation ->
-        val classId = classTimetable.id.ifEmpty { classesRef.push().key ?: return@suspendCancellableCoroutine continuation.resume(false) }
+        val classId = classTimetable.id.ifEmpty {
+            classesRef.push().key ?: return@suspendCancellableCoroutine continuation.resume(false)
+        }
         val updatedClass = classTimetable.copy(
             id = classId,
             lastModified = System.currentTimeMillis(),
             version = (classTimetable.version + 1)
         )
 
-        Log.d(DEBUG_TAG, "saveClass: start classId=$classId className=${updatedClass.className} entries=${updatedClass.entries.size} createdBy=${updatedClass.createdBy}")
+        Log.d(DEBUG_TAG, "saveClass: start classId=$classId className=${updatedClass.className} entries=${updatedClass.entries.size}")
         classesRef.child(classId).setValue(updatedClass.toMap())
             .addOnSuccessListener {
                 Log.d(DEBUG_TAG, "saveClass: success classId=$classId")
@@ -168,7 +176,7 @@ class FirebaseRepository {
             }
 
             override fun onCancelled(error: DatabaseError) {
-                Log.d(DEBUG_TAG, "getProposals: failed to read proposals: ${error.message}", error.toException())
+                Log.d(DEBUG_TAG, "getProposals: failed: ${error.message}", error.toException())
                 continuation.resume(emptyList())
             }
         })
@@ -180,13 +188,13 @@ class FirebaseRepository {
     }
 
     suspend fun saveProposal(proposal: TimetableProposal): Boolean = suspendCancellableCoroutine { continuation ->
-        val proposalId = proposal.id.ifEmpty { proposalsRef.push().key ?: return@suspendCancellableCoroutine continuation.resume(false) }
+        val proposalId = proposal.id.ifEmpty {
+            proposalsRef.push().key ?: return@suspendCancellableCoroutine continuation.resume(false)
+        }
         val updatedProposal = proposal.copy(id = proposalId)
 
         proposalsRef.child(proposalId).setValue(updatedProposal.toMap())
-            .addOnSuccessListener {
-                continuation.resume(true)
-            }
+            .addOnSuccessListener { continuation.resume(true) }
             .addOnFailureListener { e ->
                 Log.e("FirebaseRepository", "Failed to save proposal: ${e.message}")
                 continuation.resume(false)
@@ -198,7 +206,7 @@ class FirebaseRepository {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val proposalData = snapshot.value as? Map<*, *>
                 if (proposalData == null) {
-                    Log.d(DEBUG_TAG, "approveProposal: proposal not found proposalId=$proposalId")
+                    Log.d(DEBUG_TAG, "approveProposal: not found proposalId=$proposalId")
                     continuation.resume(false)
                     return
                 }
@@ -209,9 +217,7 @@ class FirebaseRepository {
                     if (entryData is Map<*, *>) {
                         @Suppress("UNCHECKED_CAST")
                         mapToTimetableEntry(entryData as Map<String, Any?>)
-                    } else {
-                        null
-                    }
+                    } else null
                 } ?: emptyList()
 
                 if (classId.isBlank()) {
@@ -236,23 +242,23 @@ class FirebaseRepository {
                                 "status" to ProposalStatus.APPROVED.name,
                                 "approvedBy" to adminId,
                                 "approvedAt" to System.currentTimeMillis(),
-                            ),
+                            )
                         ).addOnSuccessListener {
-                            Log.d(DEBUG_TAG, "approveProposal: applied proposalId=$proposalId to classId=$classId")
+                            Log.d(DEBUG_TAG, "approveProposal: success proposalId=$proposalId classId=$classId")
                             continuation.resume(true)
                         }.addOnFailureListener { e ->
-                            Log.d(DEBUG_TAG, "approveProposal: class updated but proposal status update failed proposalId=$proposalId message=${e.message}", e)
+                            Log.d(DEBUG_TAG, "approveProposal: class updated but status update failed: ${e.message}", e)
                             continuation.resume(false)
                         }
                     }
                     .addOnFailureListener { e ->
-                        Log.d(DEBUG_TAG, "approveProposal: failed to update class from proposalId=$proposalId message=${e.message}", e)
+                        Log.d(DEBUG_TAG, "approveProposal: failed to update class: ${e.message}", e)
                         continuation.resume(false)
                     }
             }
 
             override fun onCancelled(error: DatabaseError) {
-                Log.d(DEBUG_TAG, "approveProposal: cancelled proposalId=$proposalId message=${error.message}", error.toException())
+                Log.d(DEBUG_TAG, "approveProposal: cancelled proposalId=$proposalId: ${error.message}", error.toException())
                 continuation.resume(false)
             }
         })
@@ -260,9 +266,7 @@ class FirebaseRepository {
 
     suspend fun rejectProposal(proposalId: String): Boolean = suspendCancellableCoroutine { continuation ->
         proposalsRef.child(proposalId).child("status").setValue(ProposalStatus.REJECTED.name)
-            .addOnSuccessListener {
-                continuation.resume(true)
-            }
+            .addOnSuccessListener { continuation.resume(true) }
             .addOnFailureListener { e ->
                 Log.e("FirebaseRepository", "Failed to reject proposal: ${e.message}")
                 continuation.resume(false)

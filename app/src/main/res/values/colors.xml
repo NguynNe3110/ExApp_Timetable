@@ -9,4 +9,6 @@
     <color name="status_offline">#EAFFDADA</color>
     <color name="cycle_active">#EBD8FFD2</color>
     <color name="cycle_inactive">#ECECEC</color>
+    <!-- Preview tuần tiếp theo: nền xanh dương nhạt để phân biệt với tuần hiện tại -->
+    <color name="day_card_preview_background">#F0F6FF</color>
 </resources>

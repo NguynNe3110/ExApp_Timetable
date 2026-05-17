@@ -29,6 +29,9 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
     private val draftEntries = mutableListOf<TimetableEntry>()
     private var currentClass: ClassTimetable? = null
 
+    // Dùng để phát hiện local edits — không reload nếu user đang chỉnh
+    private var originalEntries = listOf<TimetableEntry>()
+
     private lateinit var classNameText: TextView
     private lateinit var weekContainer: LinearLayout
     private lateinit var loadingProgress: ProgressBar
@@ -51,10 +54,19 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
         submitButton = view.findViewById(R.id.submitButton)
         importButton = view.findViewById(R.id.importButton)
 
-        submitButton.setOnClickListener { showSubmitProposalDialog() }
-        importButton.setOnClickListener { importToMySchedule() }
+        submitButton.setOnClickListener { it.applyClickFeedback { showSubmitProposalDialog() } }
+        importButton.setOnClickListener { it.applyClickFeedback { importToMySchedule() } }
 
         loadClassTimetable()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Chỉ reload nếu user chưa có local edits (draftEntries == bản gốc từ Firebase)
+        val hasLocalEdits = draftEntries != originalEntries
+        if (!hasLocalEdits && currentClass != null) {
+            loadClassTimetable()
+        }
     }
 
     private fun loadClassTimetable() {
@@ -68,6 +80,7 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
                     currentClass = classTimetable
                     draftEntries.clear()
                     draftEntries.addAll(classTimetable.entries)
+                    originalEntries = classTimetable.entries.toList()
                     classNameText.text = classTimetable.className
                     renderTimetable(draftEntries)
                 } else {
@@ -131,8 +144,9 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
             }
             content.addView(emptyText)
         } else {
-            dayEntries.forEachIndexed { index, entry ->
-                content.addView(createEntryCard(entry, index, weekOfYear))
+            // FIX: Không truyền index theo dayEntries — dùng entry.id để tra trong draftEntries
+            dayEntries.forEach { entry ->
+                content.addView(createEntryCard(entry, weekOfYear))
             }
         }
 
@@ -140,7 +154,8 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
         return card
     }
 
-    private fun createEntryCard(entry: TimetableEntry, index: Int, weekOfYear: Int): View {
+    // FIX: Bỏ hoàn toàn param `index` — không còn dùng positional index nữa
+    private fun createEntryCard(entry: TimetableEntry, weekOfYear: Int): View {
         val card = layoutInflater.inflate(R.layout.item_timetable_entry, weekContainer, false) as MaterialCardView
         val subjectText = card.findViewById<TextView>(R.id.subjectText)
         val timeText = card.findViewById<TextView>(R.id.timeText)
@@ -165,7 +180,10 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
         val effectiveStatus = entry.effectiveStatus(weekOfYear)
         statusChip.text = if (effectiveStatus == StudyStatus.ONLINE) "Online" else "Offline"
         statusChip.chipBackgroundColor = ColorStateList.valueOf(
-            ContextCompat.getColor(requireContext(), if (effectiveStatus == StudyStatus.ONLINE) R.color.status_online else R.color.status_offline)
+            ContextCompat.getColor(
+                requireContext(),
+                if (effectiveStatus == StudyStatus.ONLINE) R.color.status_online else R.color.status_offline
+            )
         )
 
         if (entry.cycleEnabled) {
@@ -179,17 +197,19 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
         editButton.visibility = View.VISIBLE
         deleteButton.visibility = View.VISIBLE
 
-        editButton.setOnClickListener {
-            showEntryDialog(entry, index)
+        // FIX: Tra theo entry.id, không dùng positional index
+        editButton.setOnClickListener { view ->
+            view.applyClickFeedback { showEntryDialog(entry) }
         }
-        deleteButton.setOnClickListener {
-            confirmDeleteEntry(index)
+        deleteButton.setOnClickListener { view ->
+            view.applyClickFeedback { confirmDeleteEntry(entry.id) }
         }
 
         return card
     }
 
-    private fun showEntryDialog(existing: TimetableEntry? = null, editingIndex: Int? = null) {
+    // FIX: Bỏ tham số editingIndex — dùng ID lookup
+    private fun showEntryDialog(existing: TimetableEntry? = null) {
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_timetable_entry, null, false)
         val subjectField = dialogView.findViewById<TextInputEditText>(R.id.subjectField)
         val roomField = dialogView.findViewById<TextInputEditText>(R.id.roomField)
@@ -223,14 +243,15 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
         }
 
         fun updateCycleVisibility() {
-            dialogView.findViewById<View>(R.id.cycleFieldsContainer).visibility = if (cycleSwitch.isChecked) View.VISIBLE else View.GONE
+            dialogView.findViewById<View>(R.id.cycleFieldsContainer).visibility =
+                if (cycleSwitch.isChecked) View.VISIBLE else View.GONE
         }
 
         updateCycleVisibility()
         cycleSwitch.setOnCheckedChangeListener { _, _ -> updateCycleVisibility() }
 
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle(if (existing == null) "Sửa tiết học" else "Sửa tiết học")
+            .setTitle(if (existing == null) "Thêm tiết học" else "Sửa tiết học")
             .setView(dialogView)
             .setNegativeButton("Hủy", null)
             .setPositiveButton("Lưu") { _, _ ->
@@ -259,19 +280,9 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
                     return@setPositiveButton
                 }
 
-                val draft = (existing ?: TimetableEntry(
-                    id = System.currentTimeMillis(),
-                    dayOfWeek = Calendar.MONDAY,
-                    subject = "",
-                    room = "",
-                    startMinuteOfDay = 0,
-                    endMinuteOfDay = 0,
-                    baseStatus = StudyStatus.ONLINE,
-                    cycleEnabled = false,
-                    cycleStartWeekOfYear = currentWeekOfYear(),
-                    repeatGapWeeks = 1,
-                )).copy(
-                    id = existing?.id ?: System.currentTimeMillis(),
+                val entryId = existing?.id ?: System.currentTimeMillis()
+                val draft = TimetableEntry(
+                    id = entryId,
                     subject = subject,
                     room = room,
                     dayOfWeek = dayOfWeek,
@@ -279,13 +290,18 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
                     endMinuteOfDay = endMinute,
                     baseStatus = baseStatus,
                     cycleEnabled = cycleEnabled,
-                    cycleStartWeekOfYear = currentWeekOfYear(),
+                    cycleStartWeekOfYear = existing?.cycleStartWeekOfYear ?: currentWeekOfYear(),
                     repeatGapWeeks = if (cycleEnabled) repeatGapWeeks.coerceAtLeast(1) else 1,
                     note = note,
                 )
 
-                if (editingIndex != null && editingIndex in draftEntries.indices) {
-                    draftEntries[editingIndex] = draft
+                // FIX: Tìm theo ID, không theo positional index
+                val existingIdx = if (existing != null) {
+                    draftEntries.indexOfFirst { it.id == existing.id }
+                } else -1
+
+                if (existingIdx >= 0) {
+                    draftEntries[existingIdx] = draft
                 } else {
                     draftEntries.add(draft)
                 }
@@ -294,17 +310,16 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
             .show()
     }
 
-    private fun confirmDeleteEntry(index: Int) {
-        val entry = draftEntries.getOrNull(index) ?: return
+    // FIX: Tham số là entryId (Long), không phải positional index
+    private fun confirmDeleteEntry(entryId: Long) {
+        val entry = draftEntries.firstOrNull { it.id == entryId } ?: return
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("Xóa tiết học")
-            .setMessage("Xóa ${entry.subject} khỏi bản nháp?")
+            .setMessage("Xóa \"${entry.subject}\" khỏi bản nháp?")
             .setNegativeButton("Hủy", null)
             .setPositiveButton("Xóa") { _, _ ->
-                if (index in draftEntries.indices) {
-                    draftEntries.removeAt(index)
-                    renderTimetable(draftEntries)
-                }
+                draftEntries.removeAll { it.id == entryId }
+                renderTimetable(draftEntries)
             }
             .show()
     }
@@ -323,7 +338,7 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
 
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("Gửi bản nháp lên admin")
-            .setMessage("Toàn bộ chỉnh sửa sửa/xóa hiện tại sẽ được gửi thành một đề xuất để admin phê duyệt.")
+            .setMessage("Toàn bộ chỉnh sửa hiện tại sẽ được gửi thành một đề xuất để admin phê duyệt.")
             .setView(descriptionInput)
             .setNegativeButton("Hủy", null)
             .setPositiveButton("Gửi") { _, _ ->
@@ -336,19 +351,21 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
     private fun submitProposal(description: String) {
         lifecycleScope.launch {
             try {
-                val currentClass = currentClass ?: firebaseRepository.getClassById(classId) ?: return@launch
+                val cls = currentClass ?: firebaseRepository.getClassById(classId) ?: return@launch
                 val proposal = TimetableProposal(
                     classId = classId,
-                    className = currentClass.className,
+                    className = cls.className,
                     proposedBy = "user_${System.currentTimeMillis()}",
-                    proposedEntries = draftEntries.sortedWith(compareBy<TimetableEntry> { it.dayOfWeek }.thenBy { it.startMinuteOfDay }),
+                    proposedEntries = draftEntries.sortedWith(
+                        compareBy<TimetableEntry> { it.dayOfWeek }.thenBy { it.startMinuteOfDay }
+                    ),
                     description = description,
                     status = ProposalStatus.PENDING,
                 )
 
                 val success = firebaseRepository.saveProposal(proposal)
                 if (success) {
-                    Toast.makeText(requireContext(), "Đã gửi đề xuất bản nháp cho admin", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "Đã gửi đề xuất cho admin", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(requireContext(), "Lỗi khi gửi đề xuất", Toast.LENGTH_SHORT).show()
                 }
@@ -362,14 +379,28 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
         lifecycleScope.launch {
             try {
                 val current = currentClass ?: firebaseRepository.getClassById(classId) ?: return@launch
+
+                if (draftEntries.isEmpty()) {
+                    Toast.makeText(requireContext(), "Lịch lớp này đang trống, không có gì để nhập", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
                 MaterialAlertDialogBuilder(requireContext())
-                    .setTitle("Ghi đè thời khóa biểu")
-                    .setMessage("Nhập lịch từ lớp ${current.className} sẽ xóa toàn bộ lịch hiện tại của bạn và thay bằng lịch của lớp này. Bạn có muốn tiếp tục không?")
+                    .setTitle("⚠️ Xác nhận ghi đè lịch của bạn")
+                    .setMessage(
+                        "Thao tác này sẽ XÓA TOÀN BỘ lịch hiện tại của bạn ở màn hình chính và thay bằng lịch của lớp \"${current.className}\" (${draftEntries.size} tiết học).\n\nBạn có chắc muốn tiếp tục không?"
+                    )
                     .setNegativeButton("Hủy", null)
                     .setPositiveButton("Ghi đè") { _, _ ->
-                        val entries = current.entries.map { it.copy(id = System.currentTimeMillis() + kotlin.random.Random.nextLong()) }
-                        timetableRepository.saveEntries(entries)
-                        Toast.makeText(requireContext(), "Đã ghi đè toàn bộ thời khóa biểu của bạn", Toast.LENGTH_SHORT).show()
+                        val importedEntries = draftEntries.map {
+                            it.copy(id = System.currentTimeMillis() + kotlin.random.Random.nextLong())
+                        }
+                        timetableRepository.saveEntries(importedEntries)
+                        Toast.makeText(
+                            requireContext(),
+                            "✓ Đã nhập ${importedEntries.size} tiết học vào lịch của bạn",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                     .show()
             } catch (e: Exception) {
@@ -378,7 +409,21 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
         }
     }
 
-    private fun dp(value: Int): Int {
-        return (value * resources.displayMetrics.density).toInt()
-    }
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+}
+
+/**
+ * Haptic + scale animation khi nhấn nút.
+ * action() được gọi sau khi animation bắt đầu.
+ */
+private fun View.applyClickFeedback(action: () -> Unit) {
+    performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+    animate()
+        .scaleX(0.93f).scaleY(0.93f)
+        .setDuration(70)
+        .withEndAction {
+            animate().scaleX(1f).scaleY(1f).setDuration(110).start()
+        }
+        .start()
+    action()
 }

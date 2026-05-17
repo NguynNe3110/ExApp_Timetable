@@ -14,10 +14,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import com.google.android.material.color.MaterialColors
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.Chip
@@ -32,9 +30,15 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     private val entries = mutableListOf<TimetableEntry>()
 
     private lateinit var weekContainer: LinearLayout
+    private lateinit var nextWeekContainer: LinearLayout
+    private lateinit var nextWeekBadgeText: TextView
+    private lateinit var toggleNextWeekButton: MaterialButton
     private lateinit var todaySummaryText: TextView
     private lateinit var clockText: TextView
     private lateinit var reminderText: TextView
+
+    /** true = section preview đang hiển thị */
+    private var nextWeekExpanded = true
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -46,10 +50,13 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         bindViews()
         setupButtons()
+    }
 
+    override fun onResume() {
+        super.onResume()
+        entries.clear()
         entries.addAll(repository.loadEntries())
         renderAll()
 
@@ -61,6 +68,9 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     private fun bindViews() {
         val view = requireView()
         weekContainer = view.findViewById(R.id.weekContainer)
+        nextWeekContainer = view.findViewById(R.id.nextWeekContainer)
+        nextWeekBadgeText = view.findViewById(R.id.nextWeekBadgeText)
+        toggleNextWeekButton = view.findViewById(R.id.toggleNextWeekButton)
         todaySummaryText = view.findViewById(R.id.todaySummaryText)
         clockText = view.findViewById(R.id.clockText)
         reminderText = view.findViewById(R.id.reminderText)
@@ -68,29 +78,43 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
     private fun setupButtons() {
         val view = requireView()
-        view.findViewById<MaterialButton>(R.id.addLessonButton).setOnClickListener {
-            showEntryDialog(null)
-        }
 
-        view.findViewById<MaterialButton>(R.id.clearAllButton).setOnClickListener {
-            confirmClearAll()
+        view.findViewById<MaterialButton>(R.id.addLessonButton).setOnClickListener {
+            it.withClickFeedback { showEntryDialog(null) }
         }
 
         view.findViewById<MaterialButton>(R.id.setReminderButton).setOnClickListener {
-            chooseReminderTime()
+            it.withClickFeedback { chooseReminderTime() }
+        }
+
+        view.findViewById<MaterialButton>(R.id.clearAllButton).setOnClickListener {
+            it.withClickFeedback { confirmClearAll() }
         }
 
         view.findViewById<MaterialButton>(R.id.cancelReminderButton).setOnClickListener {
-            repository.saveReminderTime(null)
-            NotificationScheduler.cancel(requireContext())
-            renderAll()
-            showToast("Đã tắt nhắc lịch")
+            it.withClickFeedback {
+                repository.saveReminderTime(null)
+                NotificationScheduler.cancel(requireContext())
+                renderAll()
+                showToast("Đã tắt nhắc lịch")
+            }
         }
+
+        toggleNextWeekButton.setOnClickListener {
+            nextWeekExpanded = !nextWeekExpanded
+            applyNextWeekVisibility()
+        }
+    }
+
+    private fun applyNextWeekVisibility() {
+        nextWeekContainer.visibility = if (nextWeekExpanded) View.VISIBLE else View.GONE
+        toggleNextWeekButton.text = if (nextWeekExpanded) "Ẩn" else "Hiện"
     }
 
     private fun renderAll() {
         renderSummary()
         renderWeekSections()
+        renderNextWeekPreview()
         renderReminderState()
     }
 
@@ -102,24 +126,26 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
         val weekNumber = currentWeekOfYear(calendar)
         val todayLabel = formatTodayLabel(calendar)
-        val nextClassForClock = todayEntries.firstOrNull { it.startMinuteOfDay >= calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE) }
-            ?: todayEntries.firstOrNull()
+        val nextClassForClock = todayEntries.firstOrNull {
+            it.startMinuteOfDay >= calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+        } ?: todayEntries.firstOrNull()
+
         clockText.text = if (nextClassForClock != null) {
             "$todayLabel • Phòng: ${nextClassForClock.room}"
         } else {
             todayLabel
         }
-        val summaryText = when {
+
+        todaySummaryText.text = when {
             todayEntries.isEmpty() -> "Hôm nay chưa có môn học nào."
             else -> {
-                val nextClass = todayEntries.firstOrNull { it.startMinuteOfDay >= calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE) }
-                    ?: todayEntries.first()
+                val nextClass = todayEntries.firstOrNull {
+                    it.startMinuteOfDay >= calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+                } ?: todayEntries.first()
                 val nextStatus = nextClass.effectiveStatus(weekNumber)
                 "${todayEntries.size} môn hôm nay. Tiết gần nhất: ${nextClass.subject} lúc ${formatTime(nextClass.startMinuteOfDay)} - Phòng ${nextClass.room} (${statusLabel(nextStatus)})"
             }
         }
-
-        todaySummaryText.text = summaryText
     }
 
     private fun renderReminderState() {
@@ -144,17 +170,64 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         }
     }
 
-    private fun createDayCard(dayOfWeek: Int, dayEntries: List<TimetableEntry>, weekOfYear: Int): MaterialCardView {
+    // ────────────────────────────────────────────────
+    //  Preview tuần tiếp theo
+    // ────────────────────────────────────────────────
+
+    private fun renderNextWeekPreview() {
+        nextWeekContainer.removeAllViews()
+        val nextWeek = currentWeekOfYear() + 1  // +1 tuần so với hiện tại
+
+        // Badge mô tả
+        nextWeekBadgeText.text = "Tuần tới (tuần $nextWeek) · trạng thái theo chu kì"
+
+        orderedWeekDays().forEach { dayOfWeek ->
+            val dayEntries = entries
+                .filter { it.dayOfWeek == dayOfWeek }
+                .sortedWith(compareBy<TimetableEntry> { it.startMinuteOfDay }.thenBy { it.subject.lowercase() })
+
+            nextWeekContainer.addView(
+                createDayCard(
+                    dayOfWeek = dayOfWeek,
+                    dayEntries = dayEntries,
+                    weekOfYear = nextWeek,
+                    isPreview = true,
+                )
+            )
+        }
+
+        applyNextWeekVisibility()
+    }
+
+    // ────────────────────────────────────────────────
+    //  Card builders
+    // ────────────────────────────────────────────────
+
+    /**
+     * @param isPreview  true → ẩn nút Sửa/Xóa, background nhạt hơn để phân biệt
+     */
+    private fun createDayCard(
+        dayOfWeek: Int,
+        dayEntries: List<TimetableEntry>,
+        weekOfYear: Int,
+        isPreview: Boolean = false,
+    ): MaterialCardView {
         val context = requireContext()
+
+        // Preview dùng background hơi khác để người dùng biết đây là "xem trước"
+        val bgColor = if (isPreview) {
+            getColorCompat(R.color.day_card_preview_background)
+        } else {
+            getColorCompat(R.color.day_card_background)
+        }
+
         val card = MaterialCardView(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                bottomMargin = dp(12)
-            }
+            ).apply { bottomMargin = dp(12) }
             radius = dp(12).toFloat()
-            setCardBackgroundColor(getColorCompat(R.color.day_card_background))
+            setCardBackgroundColor(bgColor)
             strokeColor = getColorCompat(R.color.day_card_stroke)
             strokeWidth = dp(1)
             cardElevation = 0f
@@ -165,25 +238,23 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             setPadding(dp(16), dp(16), dp(16), dp(16))
         }
 
-        val header = TextView(context).apply {
+        content.addView(TextView(context).apply {
             text = "${dayLabel(dayOfWeek)} · ${dayEntries.size} môn"
             textSize = 17f
             setTextColor(getColorCompat(android.R.color.black))
             setTypeface(typeface, android.graphics.Typeface.BOLD)
-        }
-        content.addView(header)
+        })
 
         if (dayEntries.isEmpty()) {
-            val emptyText = TextView(context).apply {
+            content.addView(TextView(context).apply {
                 text = "Chưa có môn được thêm vào ngày này"
                 textSize = 14f
                 setTextColor(getColorCompat(R.color.day_card_empty_text))
                 setPadding(0, dp(8), 0, 0)
-            }
-            content.addView(emptyText)
+            })
         } else {
             dayEntries.forEach { entry ->
-                content.addView(createEntryCard(entry, weekOfYear))
+                content.addView(createEntryCard(entry, weekOfYear, isPreview))
             }
         }
 
@@ -191,7 +262,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         return card
     }
 
-    private fun createEntryCard(entry: TimetableEntry, weekOfYear: Int): View {
+    private fun createEntryCard(entry: TimetableEntry, weekOfYear: Int, isPreview: Boolean = false): View {
         val card = layoutInflater.inflate(R.layout.item_timetable_entry, weekContainer, false) as MaterialCardView
         val subjectText = card.findViewById<TextView>(R.id.subjectText)
         val timeText = card.findViewById<TextView>(R.id.timeText)
@@ -216,7 +287,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         val effectiveStatus = entry.effectiveStatus(weekOfYear)
         statusChip.text = statusLabel(effectiveStatus)
         statusChip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(
-            getColorCompat(if (effectiveStatus == StudyStatus.ONLINE) R.color.status_online else R.color.status_offline),
+            getColorCompat(if (effectiveStatus == StudyStatus.ONLINE) R.color.status_online else R.color.status_offline)
         )
         statusChip.setTextColor(getColorCompat(android.R.color.black))
 
@@ -229,15 +300,21 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         }
         cycleChip.setTextColor(getColorCompat(android.R.color.black))
 
-        editButton.setOnClickListener {
-            showEntryDialog(entry)
-        }
-        deleteButton.setOnClickListener {
-            confirmDelete(entry)
+        if (isPreview) {
+            // Trong preview: ẩn nút sửa/xóa — chỉ xem
+            editButton.visibility = View.GONE
+            deleteButton.visibility = View.GONE
+        } else {
+            editButton.setOnClickListener { it.withClickFeedback { showEntryDialog(entry) } }
+            deleteButton.setOnClickListener { it.withClickFeedback { confirmDelete(entry) } }
         }
 
         return card
     }
+
+    // ────────────────────────────────────────────────
+    //  Dialog & actions (không đổi so với bản gốc)
+    // ────────────────────────────────────────────────
 
     private fun showEntryDialog(existing: TimetableEntry?) {
         val view = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_timetable_entry, null, false)
@@ -274,16 +351,15 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         }
 
         fun updateCycleFieldsVisibility() {
-            val visibility = if (cycleSwitch.isChecked) View.VISIBLE else View.GONE
-            view.findViewById<View>(R.id.cycleFieldsContainer).visibility = visibility
+            view.findViewById<View>(R.id.cycleFieldsContainer).visibility =
+                if (cycleSwitch.isChecked) View.VISIBLE else View.GONE
         }
 
         updateCycleFieldsVisibility()
         cycleSwitch.setOnCheckedChangeListener { _, _ -> updateCycleFieldsVisibility() }
 
-        val title = if (existing == null) "Thêm môn học" else "Chỉnh sửa môn học"
         val dialog = MaterialAlertDialogBuilder(requireContext())
-            .setTitle(title)
+            .setTitle(if (existing == null) "Thêm môn học" else "Chỉnh sửa môn học")
             .setView(view)
             .setNegativeButton("Hủy", null)
             .setPositiveButton("Lưu", null)
@@ -306,39 +382,15 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 val endMinute = parseTimeToMinuteOfDay(endTimeText)
                 val baseStatus = if (statusText == "Offline") StudyStatus.OFFLINE else StudyStatus.ONLINE
 
-                if (subject.isBlank()) {
-                    subjectField.error = "Nhập tên môn học"
+                if (subject.isBlank()) { subjectField.error = "Nhập tên môn học"; return@setOnClickListener }
+                if (room.isBlank()) { roomField.error = "Nhập phòng học"; return@setOnClickListener }
+                if (dayOfWeek == null) { showToast("Chọn một ngày trong tuần"); return@setOnClickListener }
+                if (startMinute == null || endMinute == null) { showToast("Giờ phải theo định dạng HH:mm, ví dụ 07:30"); return@setOnClickListener }
+                if (endMinute <= startMinute) { showToast("Giờ kết thúc phải sau giờ bắt đầu"); return@setOnClickListener }
+                if (cycleEnabled && (repeatGapWeeks == null || repeatGapWeeks < 1)) {
+                    showToast("Khoảng cách lặp lại phải từ 1 tuần trở lên")
                     return@setOnClickListener
                 }
-
-                if (room.isBlank()) {
-                    roomField.error = "Nhập phòng học"
-                    return@setOnClickListener
-                }
-
-                if (dayOfWeek == null) {
-                    showToast("Chọn một ngày trong tuần")
-                    return@setOnClickListener
-                }
-
-                if (startMinute == null || endMinute == null) {
-                    showToast("Giờ phải theo định dạng HH:mm, ví dụ 07:30")
-                    return@setOnClickListener
-                }
-
-                if (endMinute <= startMinute) {
-                    showToast("Giờ kết thúc phải sau giờ bắt đầu")
-                    return@setOnClickListener
-                }
-
-                if (cycleEnabled) {
-                    if (repeatGapWeeks == null || repeatGapWeeks < 1) {
-                        showToast("Khoảng cách lặp lại phải từ 1 tuần trở lên")
-                        return@setOnClickListener
-                    }
-                }
-
-                val cycleStartWeek = if (cycleEnabled) currentWeekOfYear() else 1
 
                 val entry = TimetableEntry(
                     id = existing?.id ?: System.currentTimeMillis(),
@@ -349,7 +401,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                     endMinuteOfDay = endMinute,
                     baseStatus = baseStatus,
                     cycleEnabled = cycleEnabled,
-                    cycleStartWeekOfYear = cycleStartWeek,
+                    cycleStartWeekOfYear = if (cycleEnabled) currentWeekOfYear() else 1,
                     repeatGapWeeks = repeatGapWeeks ?: 2,
                     note = note,
                 )
@@ -418,7 +470,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     private fun confirmDelete(entry: TimetableEntry) {
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("Xóa môn học")
-            .setMessage("Xóa ${entry.subject} khỏi ${dayLabel(entry.dayOfWeek)}?")
+            .setMessage("Xóa \"${entry.subject}\" khỏi ${dayLabel(entry.dayOfWeek)}?")
             .setNegativeButton("Hủy", null)
             .setPositiveButton("Xóa") { _, _ ->
                 entries.removeAll { it.id == entry.id }
@@ -433,7 +485,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             showToast("Chưa có dữ liệu để xóa")
             return
         }
-
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("Xóa toàn bộ thời khóa biểu")
             .setMessage("Hành động này sẽ xóa toàn bộ môn học trong tuần. Bạn muốn tiếp tục không?")
@@ -454,38 +505,50 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         } else {
             entries.add(entry)
         }
-
         entries.sortWith(
             compareBy<TimetableEntry> { orderedWeekDays().indexOf(it.dayOfWeek) }
                 .thenBy { it.startMinuteOfDay }
-                .thenBy { it.subject.lowercase() },
+                .thenBy { it.subject.lowercase() }
         )
-
         repository.saveEntries(entries)
         renderAll()
     }
 
-    private fun createDropdownAdapter(options: List<String>): ArrayAdapter<String> {
-        return ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, options)
-    }
+    // ────────────────────────────────────────────────
+    //  Helpers
+    // ────────────────────────────────────────────────
 
-    private fun statusLabel(status: StudyStatus): String {
-        return if (status == StudyStatus.ONLINE) "Online" else "Offline"
-    }
+    private fun createDropdownAdapter(options: List<String>): ArrayAdapter<String> =
+        ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, options)
 
-    private fun formatReminderTime(reminderTime: ReminderTime): String {
-        return String.format("%02d:%02d", reminderTime.hour, reminderTime.minute)
-    }
+    private fun statusLabel(status: StudyStatus): String =
+        if (status == StudyStatus.ONLINE) "Online" else "Offline"
 
-    private fun getColorCompat(colorResId: Int): Int {
-        return ContextCompat.getColor(requireContext(), colorResId)
-    }
+    private fun formatReminderTime(reminderTime: ReminderTime): String =
+        String.format("%02d:%02d", reminderTime.hour, reminderTime.minute)
 
-    private fun dp(value: Int): Int {
-        return (value * resources.displayMetrics.density).toInt()
-    }
+    private fun getColorCompat(colorResId: Int): Int =
+        ContextCompat.getColor(requireContext(), colorResId)
 
-    private fun showToast(message: String) {
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    private fun showToast(message: String) =
         Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
-    }
+}
+
+/**
+ * Feedback xúc giác + animation thu nhỏ khi nhấn.
+ * Tự động scale về 1f sau khi action hoàn tất.
+ */
+fun View.withClickFeedback(action: () -> Unit) {
+    performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+    animate()
+        .scaleX(0.93f).scaleY(0.93f)
+        .setDuration(65)
+        .withEndAction {
+            animate().scaleX(1f).scaleY(1f).setDuration(110).start()
+        }
+        .start()
+    action()
 }

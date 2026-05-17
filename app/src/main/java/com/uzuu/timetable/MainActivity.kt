@@ -10,6 +10,7 @@ import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.NavController
+import androidx.navigation.NavOptions
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
@@ -53,6 +54,10 @@ class MainActivity : AppCompatActivity() {
         navView.setNavigationItemSelectedListener { menuItem ->
             Log.d(DEBUG_TAG, "Navigation item clicked: ${menuItem.itemId}")
             val handled = when (menuItem.itemId) {
+                R.id.menu_home -> {
+                    navigateHome(navController)
+                    true
+                }
                 R.id.menu_search_class -> {
                     navigateTo(navController, R.id.class_search_fragment)
                     true
@@ -83,6 +88,23 @@ class MainActivity : AppCompatActivity() {
         return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
     }
 
+    /**
+     * Điều hướng về Home và xóa sạch back stack —
+     * người dùng sẽ không thể nhấn Back để quay lại màn hình trước.
+     */
+    private fun navigateHome(navController: NavController) {
+        if (navController.currentDestination?.id == R.id.home_fragment) return
+        Log.d(DEBUG_TAG, "navigateHome: popping stack and going to home_fragment")
+        navController.navigate(
+            R.id.home_fragment,
+            null,
+            NavOptions.Builder()
+                .setPopUpTo(R.id.home_fragment, inclusive = false, saveState = false)
+                .setLaunchSingleTop(true)
+                .build()
+        )
+    }
+
     private fun navigateTo(navController: NavController, destinationId: Int) {
         if (navController.currentDestination?.id != destinationId) {
             Log.d(DEBUG_TAG, "Navigating to destination: $destinationId")
@@ -98,7 +120,7 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.d(DEBUG_TAG, "Firebase persistence init skipped/failed: ${e.message}", e)
         }
-        
+
         // Sign in anonymously to enable database writes
         val auth = FirebaseAuth.getInstance()
         Log.d(DEBUG_TAG, "FirebaseAuth currentUser=${auth.currentUser?.uid ?: "null"}")
