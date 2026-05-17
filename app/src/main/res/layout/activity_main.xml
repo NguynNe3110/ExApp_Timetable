@@ -30,7 +30,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"
             app:cardBackgroundColor="#101828"
-            app:cardCornerRadius="24dp"
+            app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
             app:strokeWidth="0dp">
 
@@ -83,7 +83,10 @@
                 android:layout_marginEnd="8dp"
                 android:layout_weight="1"
                 android:text="Thêm môn"
-                app:backgroundTint="#0078FA"
+                android:textColor="#004B25"
+                app:backgroundTint="#CBFFC4"
+                app:strokeColor="#89E67D"
+                app:strokeWidth="1dp"
                 android:textSize="16sp"
                 app:cornerRadius="8dp" />
 
@@ -94,7 +97,10 @@
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
                 android:text="Nhắc lịch"
-                app:backgroundTint="#0078FA"
+                android:textColor="#004B25"
+                app:backgroundTint="#CBFFC4"
+                app:strokeColor="#89E67D"
+                app:strokeWidth="1dp"
                 android:textSize="16sp"
                 app:cornerRadius="8dp" />
         </LinearLayout>
@@ -112,11 +118,11 @@
                 android:layout_marginEnd="8dp"
                 android:layout_weight="1"
                 android:text="Xóa hết"
-                android:textColor="#0066FF"
-                app:backgroundTint="#FFFFFF"
+                android:textColor="#4C3B00"
+                app:backgroundTint="#FFF7E8"
                 android:textSize="16sp"
                 app:cornerRadius="8dp"
-                app:strokeColor="#FF0000"
+                app:strokeColor="#F0D89D"
                 app:strokeWidth="1dp"
                 style="@style/Widget.Material3.Button.OutlinedButton" />
 
@@ -127,11 +133,11 @@
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
                 android:text="Tắt nhắc"
-                android:textColor="#0066FF"
-                app:backgroundTint="#FFFFFF"
+                android:textColor="#4C3B00"
+                app:backgroundTint="#FFF7E8"
                 android:textSize="16sp"
                 app:cornerRadius="8dp"
-                app:strokeColor="#FF0000"
+                app:strokeColor="#F0D89D"
                 app:strokeWidth="1dp"
                 style="@style/Widget.Material3.Button.TextButton" />
         </LinearLayout>
@@ -142,7 +148,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"
             app:cardBackgroundColor="#FFF7E8"
-            app:cardCornerRadius="22dp"
+            app:cardCornerRadius="12dp"
             app:cardElevation="0dp"
             app:strokeColor="#F0D89D"
             app:strokeWidth="1dp">
