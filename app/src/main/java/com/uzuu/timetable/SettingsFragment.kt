@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.textfield.TextInputEditText
+import com.google.firebase.database.ValueEventListener
 import kotlinx.coroutines.launch
 
 class SettingsFragment : Fragment(R.layout.fragment_settings) {
@@ -21,6 +22,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
     private lateinit var proposalsCard: MaterialCardView
     private lateinit var proposalsRecyclerView: RecyclerView
     private lateinit var proposalAdapter: ProposalAdapter
+    private var proposalsListener: ValueEventListener? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -44,6 +46,15 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         proposalsRecyclerView.adapter = proposalAdapter
     }
 
+    override fun onDestroyView() {
+        super.onDestroyView()
+        // Hủy listener khi rời khỏi màn hình để tránh memory leak
+        proposalsListener?.let { listener ->
+            firebaseRepository.removeProposalsListener(listener)
+        }
+        proposalsListener = null
+    }
+
     private fun validateAdminCode() {
         val enteredCode = adminCodeInput.text?.toString()?.trim().orEmpty()
 
@@ -55,7 +66,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         if (enteredCode == ADMIN_CODE) {
             adminPanelCard.visibility = View.GONE
             proposalsCard.visibility = View.VISIBLE
-            loadProposals()
+            startObservingProposals()
             Toast.makeText(requireContext(), "Đã mở khóa chế độ quản lý", Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(requireContext(), "Mã admin không chính xác", Toast.LENGTH_SHORT).show()
@@ -63,19 +74,15 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         }
     }
 
-    private fun loadProposals() {
-        lifecycleScope.launch {
-            try {
-                val proposals = firebaseRepository.getPendingProposals()
-                proposalAdapter.submitList(proposals)
+    private fun startObservingProposals() {
+        // Đăng ký listener mới để nhận cập nhật realtime
+        proposalsListener = firebaseRepository.observePendingProposals { proposals ->
+            proposalAdapter.submitList(proposals)
 
-                if (proposals.isEmpty()) {
-                    proposalsRecyclerView.visibility = View.GONE
-                } else {
-                    proposalsRecyclerView.visibility = View.VISIBLE
-                }
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), "Lỗi khi tải đề xuất: ${e.message}", Toast.LENGTH_SHORT).show()
+            if (proposals.isEmpty()) {
+                proposalsRecyclerView.visibility = View.GONE
+            } else {
+                proposalsRecyclerView.visibility = View.VISIBLE
             }
         }
     }
@@ -86,7 +93,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
                 val success = firebaseRepository.approveProposal(proposalId, "admin_${System.currentTimeMillis()}")
                 if (success) {
                     Toast.makeText(requireContext(), "Đã phê duyệt đề xuất", Toast.LENGTH_SHORT).show()
-                    loadProposals()
+                    // Không cần loadProposals() vì realtime listener sẽ tự động cập nhật
                 } else {
                     Toast.makeText(requireContext(), "Lỗi khi phê duyệt", Toast.LENGTH_SHORT).show()
                 }
@@ -102,7 +109,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
                 val success = firebaseRepository.rejectProposal(proposalId)
                 if (success) {
                     Toast.makeText(requireContext(), "Đã từ chối đề xuất", Toast.LENGTH_SHORT).show()
-                    loadProposals()
+                    // Không cần loadProposals() vì realtime listener sẽ tự động cập nhật
                 } else {
                     Toast.makeText(requireContext(), "Lỗi khi từ chối", Toast.LENGTH_SHORT).show()
                 }

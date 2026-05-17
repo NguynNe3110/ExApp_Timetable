@@ -187,6 +187,64 @@ class FirebaseRepository {
         return allProposals.filter { it.status == ProposalStatus.PENDING }
     }
 
+    // Realtime listener for pending proposals
+    fun observePendingProposals(onUpdate: (List<TimetableProposal>) -> Unit): ValueEventListener {
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                Log.d(DEBUG_TAG, "observePendingProposals: snapshot children=${snapshot.childrenCount}")
+                val proposals = mutableListOf<TimetableProposal>()
+                snapshot.children.forEach { child ->
+                    try {
+                        val proposalData = child.value as? Map<*, *> ?: return@forEach
+                        val entries = (proposalData["proposedEntries"] as? List<*>)?.mapNotNull { entryData ->
+                            if (entryData is Map<*, *>) {
+                                @Suppress("UNCHECKED_CAST")
+                                mapToTimetableEntry(entryData as Map<String, Any?>)
+                            } else null
+                        } ?: emptyList()
+
+                        @Suppress("UNCHECKED_CAST")
+                        val proposal = TimetableProposal(
+                            id = proposalData["id"] as? String ?: child.key ?: "",
+                            classId = proposalData["classId"] as? String ?: "",
+                            className = proposalData["className"] as? String ?: "",
+                            proposedBy = proposalData["proposedBy"] as? String ?: "",
+                            proposedEntries = entries,
+                            description = proposalData["description"] as? String ?: "",
+                            status = try {
+                                ProposalStatus.valueOf(proposalData["status"] as? String ?: ProposalStatus.PENDING.name)
+                            } catch (e: Exception) {
+                                ProposalStatus.PENDING
+                            },
+                            createdAt = (proposalData["createdAt"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+                            approvedBy = proposalData["approvedBy"] as? String,
+                            approvedAt = (proposalData["approvedAt"] as? Number)?.toLong()
+                        )
+                        
+                        // Only add pending proposals
+                        if (proposal.status == ProposalStatus.PENDING) {
+                            proposals.add(proposal)
+                        }
+                    } catch (e: Exception) {
+                        Log.e("FirebaseRepository", "Error parsing proposal data", e)
+                    }
+                }
+                onUpdate(proposals)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.d(DEBUG_TAG, "observePendingProposals: failed: ${error.message}", error.toException())
+                onUpdate(emptyList())
+            }
+        }
+        proposalsRef.addValueEventListener(listener)
+        return listener
+    }
+
+    fun removeProposalsListener(listener: ValueEventListener) {
+        proposalsRef.removeEventListener(listener)
+    }
+
     suspend fun saveProposal(proposal: TimetableProposal): Boolean = suspendCancellableCoroutine { continuation ->
         val proposalId = proposal.id.ifEmpty {
             proposalsRef.push().key ?: return@suspendCancellableCoroutine continuation.resume(false)
