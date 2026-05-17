@@ -36,8 +36,10 @@
 
 ## 🎯 Giao Diện Ứng Dụng
 
+## 🎯 Giao Diện Ứng Dụng
+
 ### Màn Hình Chính (Home)
-![Màn hình chính](app/src/main/java/com/uzuu/timetable/images/home.jpg)
+<img src="image/home.jpg" alt="Màn hình chính" width="200"/>
 
 - Hiển thị thời khóa biểu tuần hiện tại dạng card trực quan
 - Đồng hồ hiện tại và tóm tắt lịch học hôm nay
@@ -45,20 +47,20 @@
 - Navigation Drawer để truy cập tìm kiếm lớp và cài đặt
 
 ### Quản Lý Môn Học
-![Quản lý môn học](app/src/main/java/com/uzuu/timetable/images/class.jpg)
+<img src="image/class.jpg" alt="Quản lý môn học" width="200"/>
 
 - Thêm, sửa, xóa môn học dễ dàng
 - Thiết lập thông tin chi tiết: tên môn, phòng học, giờ học, trạng thái Online/Offline
 
 ### Tính Năng Nổi Bật
-![Tính năng](app/src/main/java/com/uzuu/timetable/images/feature.jpg)
+<img src="image/feature.jpg" alt="Tính năng" width="200"/>
 
 - Tìm kiếm và import thời khóa biểu lớp
 - Gửi đề xuất chỉnh sửa
 - Thông báo nhắc học thông minh
 
 ### Tùy Chọn Bổ Sung
-![Tùy chọn](app/src/main/java/com/uzuu/timetable/images/more option.jpg)
+<img src="image/more option.jpg" alt="Tùy chọn" width="200"/>
 
 - Cài đặt thông báo
 - Xem trước tuần sau
