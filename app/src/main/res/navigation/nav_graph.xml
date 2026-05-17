@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/home_fragment">
+
+    <fragment
+        android:id="@+id/home_fragment"
+        android:name="com.uzuu.timetable.HomeFragment"
+        android:label="Thời khóa biểu" />
+
+    <fragment
+        android:id="@+id/class_search_fragment"
+        android:name="com.uzuu.timetable.ClassSearchFragment"
+        android:label="Tìm kiếm lớp học" />
+
+    <fragment
+        android:id="@+id/add_class_fragment"
+        android:name="com.uzuu.timetable.AddClassFragment"
+        android:label="Thêm lớp học" />
+
+    <fragment
+        android:id="@+id/class_timetable_fragment"
+        android:name="com.uzuu.timetable.ClassTimetableFragment"
+        android:label="Thời khóa biểu lớp">
+        <argument
+            android:name="classId"
+            app:argType="string" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/settings_fragment"
+        android:name="com.uzuu.timetable.SettingsFragment"
+        android:label="Cài đặt" />
+
+</navigation>

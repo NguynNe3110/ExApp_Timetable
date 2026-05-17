@@ -116,3 +116,94 @@ fun parseTimeToMinuteOfDay(input: String): Int? {
 
     return hour * 60 + minute
 }
+
+// Firebase Models
+enum class ProposalStatus {
+    PENDING,
+    APPROVED,
+    REJECTED
+}
+
+data class ClassTimetable(
+    val id: String = "",
+    val className: String = "",
+    val entries: List<TimetableEntry> = emptyList(),
+    val createdBy: String = "",
+    val lastModified: Long = System.currentTimeMillis(),
+    val version: Int = 1,
+) {
+    fun toMap(): Map<String, Any?> {
+        return mapOf(
+            "id" to id,
+            "className" to className,
+            "entries" to entries.map { it.toMap() },
+            "createdBy" to createdBy,
+            "lastModified" to lastModified,
+            "version" to version
+        )
+    }
+}
+
+data class TimetableProposal(
+    val id: String = "",
+    val classId: String = "",
+    val className: String = "",
+    val proposedBy: String = "",
+    val proposedEntries: List<TimetableEntry> = emptyList(),
+    val description: String = "",
+    val status: ProposalStatus = ProposalStatus.PENDING,
+    val createdAt: Long = System.currentTimeMillis(),
+    val approvedBy: String? = null,
+    val approvedAt: Long? = null,
+) {
+    fun toMap(): Map<String, Any?> {
+        return mapOf(
+            "id" to id,
+            "classId" to classId,
+            "className" to className,
+            "proposedBy" to proposedBy,
+            "proposedEntries" to proposedEntries.map { it.toMap() },
+            "description" to description,
+            "status" to status.name,
+            "createdAt" to createdAt,
+            "approvedBy" to approvedBy,
+            "approvedAt" to approvedAt
+        )
+    }
+}
+
+fun TimetableEntry.toMap(): Map<String, Any?> {
+    return mapOf(
+        "id" to id,
+        "dayOfWeek" to dayOfWeek,
+        "subject" to subject,
+        "room" to room,
+        "startMinuteOfDay" to startMinuteOfDay,
+        "endMinuteOfDay" to endMinuteOfDay,
+        "baseStatus" to baseStatus.name,
+        "cycleEnabled" to cycleEnabled,
+        "cycleStartWeekOfYear" to cycleStartWeekOfYear,
+        "repeatGapWeeks" to repeatGapWeeks,
+        "note" to note
+    )
+}
+
+fun mapToTimetableEntry(map: Map<String, Any?>): TimetableEntry {
+    return TimetableEntry(
+        id = (map["id"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+        dayOfWeek = (map["dayOfWeek"] as? Number)?.toInt() ?: Calendar.MONDAY,
+        subject = map["subject"] as? String ?: "",
+        room = map["room"] as? String ?: "",
+        startMinuteOfDay = (map["startMinuteOfDay"] as? Number)?.toInt() ?: 0,
+        endMinuteOfDay = (map["endMinuteOfDay"] as? Number)?.toInt() ?: 0,
+        baseStatus = try {
+            StudyStatus.valueOf(map["baseStatus"] as? String ?: StudyStatus.ONLINE.name)
+        } catch (e: Exception) {
+            StudyStatus.ONLINE
+        },
+        cycleEnabled = map["cycleEnabled"] as? Boolean ?: false,
+        cycleStartWeekOfYear = (map["cycleStartWeekOfYear"] as? Number)?.toInt() ?: 1,
+        repeatGapWeeks = (map["repeatGapWeeks"] as? Number)?.toInt() ?: 2,
+        note = map["note"] as? String ?: ""
+    )
+}

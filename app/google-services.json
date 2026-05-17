@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "624238344962",
+    "project_id": "timetable-84bee",
+    "storage_bucket": "timetable-84bee.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:624238344962:android:431e097544479767fae01b",
+        "android_client_info": {
+          "package_name": "com.uzuu.timetable"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrWoXGDN3JXws1wrJafXdSMroLIs8qOmg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

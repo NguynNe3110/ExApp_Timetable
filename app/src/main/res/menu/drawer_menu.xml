@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/menu_search_class"
+        android:icon="@android:drawable/ic_menu_search"
+        android:title="Tìm kiếm lớp học" />
+
+    <item
+        android:id="@+id/menu_add_class"
+        android:icon="@android:drawable/ic_menu_add"
+        android:title="Thêm lớp học" />
+
+    <item
+        android:id="@+id/menu_settings"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:title="Cài đặt" />
+</menu>

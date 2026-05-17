@@ -5,8 +5,8 @@
     <color name="day_card_background">#FFFDF8</color>
     <color name="day_card_stroke">#E8E2D5</color>
     <color name="day_card_empty_text">#8A7F6A</color>
-    <color name="status_online">#BDF1CF</color>
-    <color name="status_offline">#F5C3C3</color>
-    <color name="cycle_active">#F2E7FF</color>
+    <color name="status_online">#EBDAFFD6</color>
+    <color name="status_offline">#EAFFDADA</color>
+    <color name="cycle_active">#EBD8FFD2</color>
     <color name="cycle_inactive">#ECECEC</color>
 </resources>
