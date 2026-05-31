@@ -84,6 +84,22 @@ fun formatTodayLabel(calendar: Calendar = Calendar.getInstance()): String {
     return formatter.format(Date(calendar.timeInMillis))
 }
 
+fun formatWeekDayLabel(
+    dayOfWeek: Int,
+    weekOffset: Int = 0,
+    referenceCalendar: Calendar = Calendar.getInstance(),
+): String {
+    val calendar = referenceCalendar.clone() as Calendar
+    val weekStart = startOfWeekMonday(calendar)
+    weekStart.add(Calendar.DAY_OF_YEAR, weekOffset * 7)
+
+    val dayOffset = floorMod(dayOfWeek - Calendar.MONDAY, 7)
+    weekStart.add(Calendar.DAY_OF_YEAR, dayOffset)
+
+    val formatter = SimpleDateFormat("dd/MM/yyyy", vietnameseLocale)
+    return formatter.format(Date(weekStart.timeInMillis))
+}
+
 fun currentWeekOfYear(calendar: Calendar = Calendar.getInstance()): Int {
     return calendar.get(Calendar.WEEK_OF_YEAR)
 }
@@ -100,6 +116,14 @@ fun oppositeStatus(status: StudyStatus): StudyStatus {
 
 fun floorMod(value: Int, divisor: Int): Int {
     return ((value % divisor) + divisor) % divisor
+}
+
+private fun startOfWeekMonday(calendar: Calendar): Calendar {
+    val weekStart = calendar.clone() as Calendar
+    val currentDay = weekStart.get(Calendar.DAY_OF_WEEK)
+    val daysSinceMonday = floorMod(currentDay - Calendar.MONDAY, 7)
+    weekStart.add(Calendar.DAY_OF_YEAR, -daysSinceMonday)
+    return weekStart
 }
 
 fun parseTimeToMinuteOfDay(input: String): Int? {

@@ -166,7 +166,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 .filter { it.dayOfWeek == dayOfWeek }
                 .sortedWith(compareBy<TimetableEntry> { it.startMinuteOfDay }.thenBy { it.subject.lowercase() })
 
-            weekContainer.addView(createDayCard(dayOfWeek, dayEntries, currentWeek))
+            weekContainer.addView(createDayCard(dayOfWeek, dayEntries, currentWeek, 0))
         }
     }
 
@@ -191,6 +191,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                     dayOfWeek = dayOfWeek,
                     dayEntries = dayEntries,
                     weekOfYear = nextWeek,
+                    weekOffset = 1,
                     isPreview = true,
                 )
             )
@@ -210,6 +211,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         dayOfWeek: Int,
         dayEntries: List<TimetableEntry>,
         weekOfYear: Int,
+        weekOffset: Int,
         isPreview: Boolean = false,
     ): MaterialCardView {
         val context = requireContext()
@@ -239,7 +241,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         }
 
         content.addView(TextView(context).apply {
-            text = "${dayLabel(dayOfWeek)} · ${dayEntries.size} môn"
+            text = "${dayLabel(dayOfWeek)} · ${dayEntries.size} môn · ${formatWeekDayLabel(dayOfWeek, weekOffset)}"
             textSize = 17f
             setTextColor(getColorCompat(android.R.color.black))
             setTypeface(typeface, android.graphics.Typeface.BOLD)

@@ -128,7 +128,7 @@ class ClassTimetableFragment : Fragment(R.layout.fragment_class_timetable) {
         }
 
         val header = TextView(context).apply {
-            text = "${dayLabel(dayOfWeek)} · ${dayEntries.size} môn"
+            text = "${dayLabel(dayOfWeek)} · ${dayEntries.size} môn · ${formatWeekDayLabel(dayOfWeek)}"
             textSize = 17f
             setTextColor(ContextCompat.getColor(context, android.R.color.black))
             setTypeface(typeface, android.graphics.Typeface.BOLD)
