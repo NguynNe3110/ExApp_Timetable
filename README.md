@@ -36,8 +36,6 @@
 
 ## 🎯 Giao Diện Ứng Dụng
 
-## 🎯 Giao Diện Ứng Dụng
-
 ### Màn Hình Chính (Home)
 <img src="app/src/main/java/com/uzuu/timetable/images/home.jpg" alt="Màn hình chính" width="200"/>
 
